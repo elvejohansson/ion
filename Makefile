@@ -1,21 +1,20 @@
 TARGET := ion
 
+CXX = g++
+CXXFLAGS := -std=c++11
+
 SRC_DIR := src
 OUT_DIR := build
 
-SRCS := $(shell find $(SRC_DIR) -name '*.c')
+SRCS := $(shell find $(SRC_DIR) -name '*.cpp')
 OBJS := $(SRCS:%=$(OUT_DIR)/%.o)
 
-.PHONY: run
-run: $(OUT_DIR)/$(TARGET)
-	./$(OUT_DIR)/$(TARGET)
-
 $(OUT_DIR)/$(TARGET): $(OBJS)
-	$(CC) $(OBJS) -o $@
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $@
 
-$(OUT_DIR)/%.c.o: %.c
+$(OUT_DIR)/%.cpp.o: %.cpp
 	mkdir -p $(dir $@)
-	$(CC) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 .PHONY: clean
 clean:
