@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -17,7 +18,6 @@ typedef struct Token {
 } Token;
 
 typedef enum NodeType {
-    Root,
     Operator,
     Number,
 } NodeType;
@@ -43,7 +43,6 @@ std::string print_token_type(TokenType token_type)
 std::string print_node_type(NodeType node_type)
 {
     switch (node_type) {
-        case NodeType::Root: return "Root";
         case NodeType::Operator: return "Operator";
         case NodeType::Number: return "Number";
     }
@@ -187,6 +186,25 @@ void print_ast(const std::shared_ptr<ASTNode>& node, int depth = 0) {
     }
 }
 
+void generate_code(const std::shared_ptr<ASTNode> node, std::stringstream& stream)
+{
+    if (node->type == NodeType::Number) {
+        stream << "mov x0, #" << node->value << "\n";
+    } else if (node->type == NodeType::Operator) {
+        generate_code(node->children[0], stream);
+        stream << "str x0, [sp]\n";
+        generate_code(node->children[1], stream);
+        stream << "ldr x1, [sp]\n";
+
+        if (node->value == "+") {
+            stream << "add x0, x1, x0\n";
+        } else if (node->value == "-") {
+            stream << "sub x0, x1, x0\n";
+        }
+    }
+}
+
+
 int main(int argc, char **argv)
 {
     if (argc < 2) {
@@ -202,20 +220,49 @@ int main(int argc, char **argv)
         contents = contents_stream.str();
     }
 
-    auto start = std::chrono::high_resolution_clock::now();
+    auto tokenizer_start = std::chrono::high_resolution_clock::now();
     std::vector<Token> tokens = tokenize(contents);
-    auto elapsed = std::chrono::high_resolution_clock::now() - start;
-    long long milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
-    printf("Tokenizer took %lld ms\n", milliseconds);
+    auto tokenizer_elapsed = std::chrono::high_resolution_clock::now() - tokenizer_start;
 
     printf("\n");
     for (int i = 0; i < tokens.size(); i++) {
         printf("%d: %s %s\n", i, print_token_type(tokens[i].type).c_str(), tokens[i].value.c_str());
     }
 
-    std::shared_ptr<ASTNode> root_node = parse(&tokens);
+    auto parser_start = std::chrono::high_resolution_clock::now();
+    std::shared_ptr<ASTNode> node = parse(&tokens);
+    auto parser_elapsed = std::chrono::high_resolution_clock::now() - parser_start;
+
     printf("\n");
-    print_ast(root_node);
+    print_ast(node);
+
+    auto generator_start = std::chrono::high_resolution_clock::now();
+    std::stringstream buffer;
+    buffer << ".global _start\n";
+    buffer << ".text\n";
+    buffer << "_start:\n";
+    buffer << "sub sp, sp, #16\n";
+
+    generate_code(node, buffer);
+
+    buffer << "mov x16, #1\n";
+    buffer << "svc #0\n";
+
+    std::ofstream program;
+    program.open("program.s");
+    program << buffer.str();
+    program.close();
+
+    auto generator_elapsed = std::chrono::high_resolution_clock::now() - parser_start;
+
+    long long tokenizer_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(tokenizer_elapsed).count();
+    long long parser_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(parser_elapsed).count();
+    long long generator_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(generator_elapsed).count();
+
+    printf("\n");
+    printf("Tokenizer took %lld μs\n", tokenizer_microseconds);
+    printf("Parser took %lld μs\n", parser_microseconds);
+    printf("Code generation took %lld μs\n", generator_microseconds);
 
     return 0;
 }
