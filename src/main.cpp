@@ -5,12 +5,14 @@
 #include <iostream>
 #include <sstream>
 
-typedef enum TokenType {
+enum TokenType {
     INT_LIT,
     OPERATOR_PLUS,
     OPERATOR_MINUS,
+    OPERATOR_STAR,
+    OPERATOR_SLASH,
     _EOF,
-} TokenType;
+};
 
 typedef struct Token {
     TokenType type;
@@ -33,10 +35,12 @@ typedef struct ASTNode {
 std::string print_token_type(TokenType token_type)
 {
     switch (token_type) {
-        case INT_LIT: return "INT_LIT";
-        case OPERATOR_PLUS: return "OPERATOR_PLUS";
-        case OPERATOR_MINUS: return "OPERATOR_MINUS";
-        case _EOF: return "EOF";
+        case TokenType::INT_LIT: return "INT_LIT";
+        case TokenType::OPERATOR_PLUS: return "OPERATOR_PLUS";
+        case TokenType::OPERATOR_MINUS: return "OPERATOR_MINUS";
+        case TokenType::OPERATOR_STAR: return "OPERATOR_STAR";
+        case TokenType::OPERATOR_SLASH: return "OPERATOR_SLASH";
+        case TokenType::_EOF: return "EOF";
     }
 }
 
@@ -89,19 +93,31 @@ std::vector<Token> tokenize(const std::string contents)
             i--;
 
             Token token;
-            token.type = INT_LIT;
+            token.type = TokenType::INT_LIT;
             token.value = buffer;
             tokens.push_back(token);
             buffer.clear();
         } else if (current_char == '+') {
             Token token;
-            token.type = OPERATOR_PLUS;
+            token.type = TokenType::OPERATOR_PLUS;
             tokens.push_back(token);
 
             char_count++;
         } else if (current_char == '-') {
             Token token;
-            token.type = OPERATOR_MINUS;
+            token.type = TokenType::OPERATOR_MINUS;
+            tokens.push_back(token);
+
+            char_count++;
+        } else if (current_char == '*') {
+            Token token;
+            token.type = TokenType::OPERATOR_STAR;
+            tokens.push_back(token);
+
+            char_count++;
+        } else if (current_char == '/') {
+            Token token;
+            token.type = TokenType::OPERATOR_SLASH;
             tokens.push_back(token);
 
             char_count++;
@@ -161,13 +177,37 @@ std::shared_ptr<ASTNode> parse_factor(const std::vector<Token>* tokens)
     exit(EXIT_FAILURE);
 }
 
-std::shared_ptr<ASTNode> parse_expression(const std::vector<Token>* tokens)
+std::shared_ptr<ASTNode> parse_term(const std::vector<Token>* tokens)
 {
     std::shared_ptr<ASTNode> node = parse_factor(tokens);
 
-    while (match(tokens, TokenType::OPERATOR_PLUS) || match(tokens, TokenType::OPERATOR_MINUS)) {
+    while (match(tokens, TokenType::OPERATOR_STAR) || match(tokens, TokenType::OPERATOR_SLASH)) {
         TokenType type = tokens->at(current - 1).type;
         std::shared_ptr<ASTNode> right = parse_factor(tokens);
+
+        std::string operation;
+        if (type == TokenType::OPERATOR_STAR) {
+            operation = "*";
+        } else if (type == TokenType::OPERATOR_SLASH) {
+            operation = "/";
+        }
+
+        std::shared_ptr<ASTNode> newNode = std::make_shared<ASTNode>(NodeType::Operator, operation);
+        newNode->children.push_back(node);
+        newNode->children.push_back(right);
+        node = newNode;
+    }
+
+    return node;
+}
+
+std::shared_ptr<ASTNode> parse_expression(const std::vector<Token>* tokens)
+{
+    std::shared_ptr<ASTNode> node = parse_term(tokens);
+
+    while (match(tokens, TokenType::OPERATOR_PLUS) || match(tokens, TokenType::OPERATOR_MINUS)) {
+        TokenType type = tokens->at(current - 1).type;
+        std::shared_ptr<ASTNode> right = parse_term(tokens);
 
         std::string operation;
         if (type == TokenType::OPERATOR_MINUS) {
@@ -208,14 +248,19 @@ void generate_code(const std::shared_ptr<ASTNode> node, std::stringstream& strea
         stream << "mov x0, #" << node->value << "\n";
     } else if (node->type == NodeType::Operator) {
         generate_code(node->children[0], stream);
-        stream << "str x0, [sp]\n";
+        stream << "str x0, [sp, -16]!\n";
+
         generate_code(node->children[1], stream);
-        stream << "ldr x1, [sp]\n";
+        stream << "ldr x1, [sp], 16\n";
 
         if (node->value == "+") {
             stream << "add x0, x1, x0\n";
         } else if (node->value == "-") {
             stream << "sub x0, x1, x0\n";
+        } else if (node->value == "*") {
+            stream << "mul x0, x1, x0\n";
+        } else if (node->value == "/") {
+            stream << "sdiv x0, x1, x0\n";
         }
     }
 }
@@ -257,7 +302,6 @@ int main(int argc, char **argv)
     buffer << ".global _start\n";
     buffer << ".text\n";
     buffer << "_start:\n";
-    buffer << "sub sp, sp, #16\n";
 
     generate_code(node, buffer);
 
