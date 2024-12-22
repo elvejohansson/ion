@@ -52,7 +52,10 @@ std::vector<Token> tokenize(const std::string contents)
 {
     std::vector<Token> tokens;
 
+    int line_count = 1;
+    int char_count = 1;
     std::string buffer;
+
     for (int i = 0; i < contents.length(); i++) {
         char current_char = contents.at(i);
 
@@ -60,23 +63,27 @@ std::vector<Token> tokenize(const std::string contents)
             buffer.push_back(current_char);
 
             i++;
+            char_count++;
 
             while (std::isalnum(contents.at(i))) {
                 buffer.push_back(contents.at(i));
                 i++;
+                char_count++;
             }
 
             i--;
 
-            printf("Unknown word \"%s\".\n", buffer.c_str());
+            printf("Unknown keyword on line %d: \"%s\".\n", line_count, buffer.c_str());
             exit(EXIT_FAILURE);
         } else if (std::isdigit(current_char)) {
             buffer.push_back(current_char);
             i++;
+            char_count++;
 
             while (std::isdigit(contents.at(i))) {
                 buffer.push_back(contents.at(i));
                 i++;
+                char_count++;
             }
 
             i--;
@@ -90,14 +97,23 @@ std::vector<Token> tokenize(const std::string contents)
             Token token;
             token.type = OPERATOR_PLUS;
             tokens.push_back(token);
+
+            char_count++;
         } else if (current_char == '-') {
             Token token;
             token.type = OPERATOR_MINUS;
             tokens.push_back(token);
+
+            char_count++;
+        } else if (current_char == '\n') {
+            line_count++;
+            char_count = 1;
+            continue;
         } else if (isspace(current_char)) {
+            char_count++;
             continue;
         } else {
-            printf("Syntax error\n");
+            printf("Syntax error at %d:%d\n.", line_count, char_count);
             exit(EXIT_FAILURE);
         }
     }
