@@ -6,13 +6,18 @@
 #include <sstream>
 
 enum TokenType {
-    INT_LIT,
-    OPERATOR_PLUS,
-    OPERATOR_MINUS,
-    OPERATOR_STAR,
-    OPERATOR_SLASH,
-    LEFT_PAREN,
-    RIGHT_PAREN,
+    INT_LIT,    // 123
+    IDENTIFIER, // 123
+    ASSIGNMENT, // =
+
+    OPERATOR_PLUS,       // +
+    OPERATOR_MINUS,      // -
+    OPERATOR_STAR,       // *
+    OPERATOR_SLASH,      // /
+
+    LEFT_PAREN,          // (
+    RIGHT_PAREN,         // )
+
     _EOF,
 };
 
@@ -22,7 +27,8 @@ typedef struct Token {
 } Token;
 
 typedef enum NodeType {
-    Operator,
+    Assignment,
+    BinaryOperator,
     Number,
 } NodeType;
 
@@ -38,6 +44,8 @@ std::string print_token_type(TokenType token_type)
 {
     switch (token_type) {
         case TokenType::INT_LIT: return "INT_LIT";
+        case TokenType::IDENTIFIER: return "IDENTIFIER";
+        case TokenType::ASSIGNMENT: return "ASSIGNMENT";
         case TokenType::OPERATOR_PLUS: return "OPERATOR_PLUS";
         case TokenType::OPERATOR_MINUS: return "OPERATOR_MINUS";
         case TokenType::OPERATOR_STAR: return "OPERATOR_STAR";
@@ -51,7 +59,8 @@ std::string print_token_type(TokenType token_type)
 std::string print_node_type(NodeType node_type)
 {
     switch (node_type) {
-        case NodeType::Operator: return "Operator";
+        case NodeType::Assignment: return "Assignment";
+        case NodeType::BinaryOperator: return "Operator";
         case NodeType::Number: return "Number";
     }
 }
@@ -81,8 +90,14 @@ std::vector<Token> tokenize(const std::string contents)
 
             i--;
 
-            printf("Unknown keyword on line %d: \"%s\".\n", line_count, buffer.c_str());
-            exit(EXIT_FAILURE);
+            Token token;
+            token.type = TokenType::IDENTIFIER;
+            token.value = buffer;
+            tokens.push_back(token);
+            buffer.clear();
+
+            //printf("Unknown keyword on line %d: \"%s\".\n", line_count, buffer.c_str());
+            //exit(EXIT_FAILURE);
         } else if (std::isdigit(current_char)) {
             buffer.push_back(current_char);
             i++;
@@ -137,6 +152,12 @@ std::vector<Token> tokenize(const std::string contents)
             tokens.push_back(token);
 
             char_count++;
+        } else if (current_char == '=') {
+            Token token;
+            token.type = TokenType::ASSIGNMENT;
+            tokens.push_back(token);
+
+            char_count++;
         } else if (current_char == '\n') {
             line_count++;
             char_count = 1;
@@ -155,10 +176,10 @@ std::vector<Token> tokenize(const std::string contents)
 
 int current = 0;
 
-Token peek(const std::vector<Token>* tokens)
+Token peek(const std::vector<Token>* tokens, int lookahead = 0)
 {
-    if (current < tokens->size()) {
-        return (*tokens)[current];
+    if (current + lookahead < tokens->size()) {
+        return (*tokens)[current + lookahead];
     }
 
     return { TokenType::_EOF };
@@ -186,6 +207,7 @@ const bool match(const std::vector<Token>* tokens, TokenType type)
 std::shared_ptr<ASTNode> parse_factor(const std::vector<Token>* tokens);
 std::shared_ptr<ASTNode> parse_term(const std::vector<Token>* tokens);
 std::shared_ptr<ASTNode> parse_expression(const std::vector<Token>* tokens);
+std::shared_ptr<ASTNode> parse_statement(const std::vector<Token>* tokens);
 
 std::shared_ptr<ASTNode> parse_factor(const std::vector<Token>* tokens)
 {
@@ -223,7 +245,7 @@ std::shared_ptr<ASTNode> parse_term(const std::vector<Token>* tokens)
             operation = "/";
         }
 
-        std::shared_ptr<ASTNode> newNode = std::make_shared<ASTNode>(NodeType::Operator, operation);
+        std::shared_ptr<ASTNode> newNode = std::make_shared<ASTNode>(NodeType::BinaryOperator, operation);
         newNode->children.push_back(node);
         newNode->children.push_back(right);
         node = newNode;
@@ -247,7 +269,7 @@ std::shared_ptr<ASTNode> parse_expression(const std::vector<Token>* tokens)
             operation = "+";
         }
 
-        std::shared_ptr<ASTNode> newNode = std::make_shared<ASTNode>(NodeType::Operator, operation);
+        std::shared_ptr<ASTNode> newNode = std::make_shared<ASTNode>(NodeType::BinaryOperator, operation);
         newNode->children.push_back(node);
         newNode->children.push_back(right);
         node = newNode;
@@ -256,43 +278,82 @@ std::shared_ptr<ASTNode> parse_expression(const std::vector<Token>* tokens)
     return node;
 }
 
+std::shared_ptr<ASTNode> parse_statement(const std::vector<Token>* tokens)
+{
+    if (peek(tokens).type == TokenType::IDENTIFIER && peek(tokens, 1).type == TokenType::ASSIGNMENT) {
+        Token identifier_node = advance(tokens);
+        advance(tokens); // discard assignment operator
+
+        std::shared_ptr<ASTNode> assignment_expression_node = parse_expression(tokens);
+
+        std::shared_ptr<ASTNode> node = std::make_shared<ASTNode>(
+                NodeType::Assignment,
+                identifier_node.value
+        );
+        node->children.push_back(assignment_expression_node);
+
+        return node;
+    }
+
+    return parse_expression(tokens);
+}
+
 std::shared_ptr<ASTNode> parse(const std::vector<Token>* tokens)
 {
     current = 0;
 
-    std::shared_ptr<ASTNode> node = parse_expression(tokens);
+    std::shared_ptr<ASTNode> node = parse_statement(tokens);
 
     return node;
 }
 
 void print_ast(const std::shared_ptr<ASTNode>& node, int depth = 0) {
-    if (!node) return;
     printf("%s", std::string(std::string(depth * 2, ' ') + print_node_type(node->type) + ": " + node->value + "\n").c_str());
     for (const auto& child : node->children) {
         print_ast(child, depth + 1);
     }
 }
 
+std::unordered_map<std::string, int> symbol_table;
+int current_offset = -16;
+
+int get_variable_offset(const std::string& variable_name) {
+
+    if (symbol_table.find(variable_name) == symbol_table.end()) {
+        symbol_table[variable_name] = current_offset;
+        current_offset -= 16;
+    }
+
+    return symbol_table[variable_name];
+}
+
 void generate_code(const std::shared_ptr<ASTNode> node, std::stringstream& stream)
 {
     if (node->type == NodeType::Number) {
-        stream << "mov x0, #" << node->value << "\n";
-    } else if (node->type == NodeType::Operator) {
+        stream << "\tmov x0, #" << node->value << "\n";
+    } else if (node->type == NodeType::BinaryOperator) {
         generate_code(node->children[0], stream);
-        stream << "str x0, [sp, -16]!\n";
+        stream << "\tstr x0, [sp, -16]!\n";
 
         generate_code(node->children[1], stream);
-        stream << "ldr x1, [sp], 16\n";
+        stream << "\tldr x1, [sp], 16\n";
 
         if (node->value == "+") {
-            stream << "add x0, x1, x0\n";
+            stream << "\tadd x0, x1, x0\n";
         } else if (node->value == "-") {
-            stream << "sub x0, x1, x0\n";
+            stream << "\tsub x0, x1, x0\n";
         } else if (node->value == "*") {
-            stream << "mul x0, x1, x0\n";
+            stream << "\tmul x0, x1, x0\n";
         } else if (node->value == "/") {
-            stream << "sdiv x0, x1, x0\n";
+            stream << "\tsdiv x0, x1, x0\n";
         }
+    } else if (node->type == NodeType::Assignment) {
+        generate_code(node->children[0], stream);
+
+        std::string variable_name = node->value;
+        int stack_offset = get_variable_offset(variable_name);
+
+        stream << "\tstr x0, [sp, " << stack_offset << "]\n";
     }
 }
 
@@ -332,12 +393,12 @@ int main(int argc, char **argv)
     std::stringstream buffer;
     buffer << ".global _start\n";
     buffer << ".text\n";
-    buffer << "_start:\n";
+    buffer << "\n_start:\n";
 
     generate_code(node, buffer);
 
-    buffer << "mov x16, #1\n";
-    buffer << "svc #0\n";
+    buffer << "\tmov x16, #1\n";
+    buffer << "\tsvc #0\n";
 
     std::ofstream program;
     program.open("program.s");
