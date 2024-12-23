@@ -5,6 +5,14 @@
 #include <iostream>
 #include <sstream>
 
+#if defined (__APPLE__)
+    #define _MAC_OS
+#endif
+
+#if defined (__aarch64__)
+    #define _ARM64
+#endif
+
 enum TokenType {
     INT_LIT,        // 123
     IDENTIFIER,     // xy
@@ -354,6 +362,22 @@ void generate_code(const std::shared_ptr<ASTNode> node, std::stringstream& strea
     }
 }
 
+void compile_program(const std::stringstream& stream)
+{
+    std::ofstream program;
+    program.open("./build/program.s");
+    program << stream.str();
+    program.close();
+
+#if defined (_MAC_OS) && defined (_ARM64)
+    std::system("as ./build/program.s -o ./build/program.o");
+    std::system("ld ./build/program.o -o ./build/program -e _start");
+    printf("\nSuccessfully compiled program.\n");
+#else
+    printf("\nUnsupported compilation architecture, exiting...\n");
+    exit(EXIT_FAILURE);
+#endif
+}
 
 int main(int argc, char **argv)
 {
@@ -397,21 +421,22 @@ int main(int argc, char **argv)
     buffer << "\tmov x16, #1\n";
     buffer << "\tsvc #0\n";
 
-    std::ofstream program;
-    program.open("program.s");
-    program << buffer.str();
-    program.close();
-
     auto generator_elapsed = std::chrono::high_resolution_clock::now() - generator_start;
 
-    long long tokenizer_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(tokenizer_elapsed).count();
-    long long parser_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(parser_elapsed).count();
-    long long generator_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(generator_elapsed).count();
+    auto compilation_start = std::chrono::high_resolution_clock::now();
+    compile_program(buffer);
+    auto compilation_elapsed = std::chrono::high_resolution_clock::now() - compilation_start;
+
+    float tokenizer_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(tokenizer_elapsed).count();
+    float parser_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(parser_elapsed).count();
+    float generator_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(generator_elapsed).count();
+    long long compilation_milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(compilation_elapsed).count();
 
     printf("\n");
-    printf("Tokenizer took %lld μs\n", tokenizer_microseconds);
-    printf("Parser took %lld μs\n", parser_microseconds);
-    printf("Code generation took %lld μs\n", generator_microseconds);
+    printf("Tokenization took %f ms\n", tokenizer_microseconds / 1000);
+    printf("Parsing took %f ms\n", parser_microseconds / 1000);
+    printf("Code generation took %f ms\n", generator_microseconds / 1000);
+    printf("Compilation took %lld ms\n", compilation_milliseconds);
 
     return 0;
 }
