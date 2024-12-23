@@ -1,7 +1,7 @@
 TARGET := ion
 
 CXX = g++
-CXXFLAGS := -std=c++11
+CXXFLAGS := -Wall -Werror -Wshadow -pedantic -std=c++11
 
 SRC_DIR := src
 OUT_DIR := build
@@ -13,7 +13,7 @@ OBJS := $(SRCS:%=$(OUT_DIR)/%.o)
 run: $(OUT_DIR)/$(TARGET)
 	./$(OUT_DIR)/$(TARGET) test.ion
 	@mv program.s ./$(OUT_DIR)/program.s
-	@echo "\ncompiling output assembly..."
+	@echo "\ncompiling output assembly...\n"
 	@as ./$(OUT_DIR)/program.s -o $(OUT_DIR)/program.o
 	@ld $(OUT_DIR)/program.o -o $(OUT_DIR)/program -e _start
 	./$(OUT_DIR)/program

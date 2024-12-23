@@ -6,39 +6,39 @@
 #include <sstream>
 
 enum TokenType {
-    INT_LIT,    // 123
-    IDENTIFIER, // 123
-    ASSIGNMENT, // =
+    INT_LIT,        // 123
+    IDENTIFIER,     // xy
+    ASSIGNMENT,     // =
 
-    OPERATOR_PLUS,       // +
-    OPERATOR_MINUS,      // -
-    OPERATOR_STAR,       // *
-    OPERATOR_SLASH,      // /
+    OPERATOR_PLUS,  // +
+    OPERATOR_MINUS, // -
+    OPERATOR_STAR,  // *
+    OPERATOR_SLASH, // /
 
-    LEFT_PAREN,          // (
-    RIGHT_PAREN,         // )
+    LEFT_PAREN,     // (
+    RIGHT_PAREN,    // )
 
     _EOF,
 };
 
-typedef struct Token {
+struct Token {
     TokenType type;
     std::string value;
-} Token;
+};
 
-typedef enum NodeType {
+enum NodeType {
     Assignment,
     BinaryOperator,
     Number,
-} NodeType;
+};
 
-typedef struct ASTNode {
+struct ASTNode {
     NodeType type;
     std::string value;
     std::vector<std::shared_ptr<ASTNode>> children;
 
     ASTNode(const NodeType& t, const std::string& v) : type(t), value(v) {}
-} ASTNode;
+};
 
 std::string print_token_type(TokenType token_type)
 {
@@ -95,9 +95,6 @@ std::vector<Token> tokenize(const std::string contents)
             token.value = buffer;
             tokens.push_back(token);
             buffer.clear();
-
-            //printf("Unknown keyword on line %d: \"%s\".\n", line_count, buffer.c_str());
-            //exit(EXIT_FAILURE);
         } else if (std::isdigit(current_char)) {
             buffer.push_back(current_char);
             i++;
@@ -245,10 +242,10 @@ std::shared_ptr<ASTNode> parse_term(const std::vector<Token>* tokens)
             operation = "/";
         }
 
-        std::shared_ptr<ASTNode> newNode = std::make_shared<ASTNode>(NodeType::BinaryOperator, operation);
-        newNode->children.push_back(node);
-        newNode->children.push_back(right);
-        node = newNode;
+        std::shared_ptr<ASTNode> operator_node = std::make_shared<ASTNode>(NodeType::BinaryOperator, operation);
+        operator_node->children.push_back(node);
+        operator_node->children.push_back(right);
+        node = operator_node;
     }
 
     return node;
@@ -405,7 +402,7 @@ int main(int argc, char **argv)
     program << buffer.str();
     program.close();
 
-    auto generator_elapsed = std::chrono::high_resolution_clock::now() - parser_start;
+    auto generator_elapsed = std::chrono::high_resolution_clock::now() - generator_start;
 
     long long tokenizer_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(tokenizer_elapsed).count();
     long long parser_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(parser_elapsed).count();
