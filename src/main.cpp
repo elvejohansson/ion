@@ -35,6 +35,7 @@ struct Token {
 };
 
 enum NodeType {
+    Root,
     Assignment,
     BinaryOperator,
     Number,
@@ -48,7 +49,7 @@ struct ASTNode {
     ASTNode(const NodeType& t, const std::string& v) : type(t), value(v) {}
 };
 
-std::string print_token_type(TokenType token_type)
+const char* print_token_type(TokenType token_type)
 {
     switch (token_type) {
         case TokenType::INT_LIT: return "INT_LIT";
@@ -64,9 +65,10 @@ std::string print_token_type(TokenType token_type)
     }
 }
 
-std::string print_node_type(NodeType node_type)
+const char* print_node_type(NodeType node_type)
 {
     switch (node_type) {
+        case NodeType::Root: return "Root";
         case NodeType::Assignment: return "Assignment";
         case NodeType::BinaryOperator: return "Operator";
         case NodeType::Number: return "Number";
@@ -175,6 +177,12 @@ std::vector<Token> tokenize(const std::string contents)
             exit(EXIT_FAILURE);
         }
     }
+
+    // lets push this on at the end to make life easier in the future
+    // (i have no idea if this will actually bring any benefits)
+    Token token;
+    token.type = TokenType::_EOF;
+    tokens.push_back(token);
 
     return tokens;
 }
@@ -300,20 +308,29 @@ std::shared_ptr<ASTNode> parse_statement(const std::vector<Token>* tokens)
         return node;
     }
 
-    return parse_expression(tokens);
+    printf("Syntax error, unexpected type %s.", print_token_type(peek(tokens).type));
+    exit(EXIT_FAILURE);
+
+    // return parse_expression(tokens);
 }
 
-std::shared_ptr<ASTNode> parse(const std::vector<Token>* tokens)
+std::shared_ptr<ASTNode> parse(const std::vector<Token>* tokens, const std::shared_ptr<ASTNode> root_node)
 {
     current = 0;
 
-    std::shared_ptr<ASTNode> node = parse_statement(tokens);
+    while (peek(tokens).type != TokenType::_EOF) {
+        auto statement_node = parse_statement(tokens);
 
-    return node;
+        root_node->children.push_back(statement_node);
+    }
+
+    return root_node;
 }
 
 void print_ast(const std::shared_ptr<ASTNode>& node, int depth = 0) {
-    printf("%s", std::string(std::string(depth * 2, ' ') + print_node_type(node->type) + ": " + node->value + "\n").c_str());
+    auto indent_string = std::string(depth * 2, ' ');
+
+    printf("%s%s: %s\n", indent_string.c_str(), print_node_type(node->type), node->value.c_str());
     for (const auto& child : node->children) {
         print_ast(child, depth + 1);
     }
@@ -334,31 +351,46 @@ int get_variable_offset(const std::string& variable_name) {
 
 void generate_code(const std::shared_ptr<ASTNode> node, std::stringstream& stream)
 {
-    if (node->type == NodeType::Number) {
-        stream << "\tmov x0, #" << node->value << "\n";
-    } else if (node->type == NodeType::BinaryOperator) {
-        generate_code(node->children[0], stream);
-        stream << "\tstr x0, [sp, -16]!\n";
-
-        generate_code(node->children[1], stream);
-        stream << "\tldr x1, [sp], 16\n";
-
-        if (node->value == "+") {
-            stream << "\tadd x0, x1, x0\n";
-        } else if (node->value == "-") {
-            stream << "\tsub x0, x1, x0\n";
-        } else if (node->value == "*") {
-            stream << "\tmul x0, x1, x0\n";
-        } else if (node->value == "/") {
-            stream << "\tsdiv x0, x1, x0\n";
+    switch (node->type) {
+        case NodeType::Root: {
+            for (int i = 0; i < node->children.size(); i++) {
+                generate_code(node->children[i], stream);
+            }
+            break;
         }
-    } else if (node->type == NodeType::Assignment) {
-        generate_code(node->children[0], stream);
+        case NodeType::Number: {
+            stream << "\tmov x0, #" << node->value << "\n";
+            break;
+        }
+        case NodeType::BinaryOperator: {
+            generate_code(node->children[0], stream);
+            stream << "\tstr x0, [sp, -16]!\n";
 
-        std::string variable_name = node->value;
-        int stack_offset = get_variable_offset(variable_name);
+            generate_code(node->children[1], stream);
+            stream << "\tldr x1, [sp], 16\n";
 
-        stream << "\tstr x0, [sp, " << stack_offset << "]\n";
+            if (node->value == "+") {
+                stream << "\tadd x0, x1, x0\n";
+            } else if (node->value == "-") {
+                stream << "\tsub x0, x1, x0\n";
+            } else if (node->value == "*") {
+                stream << "\tmul x0, x1, x0\n";
+            } else if (node->value == "/") {
+                stream << "\tsdiv x0, x1, x0\n";
+            }
+
+            break;
+        }
+        case NodeType::Assignment: {
+            generate_code(node->children[0], stream);
+
+            std::string variable_name = node->value;
+            int stack_offset = get_variable_offset(variable_name);
+
+            stream << "\tstr x0, [sp, " << stack_offset << "]\n";
+
+            break;
+        }
     }
 }
 
@@ -400,15 +432,16 @@ int main(int argc, char **argv)
 
     printf("\n");
     for (int i = 0; i < tokens.size(); i++) {
-        printf("%d: %s %s\n", i, print_token_type(tokens[i].type).c_str(), tokens[i].value.c_str());
+        printf("%d: %s %s\n", i, print_token_type(tokens[i].type), tokens[i].value.c_str());
     }
 
     auto parser_start = std::chrono::high_resolution_clock::now();
-    std::shared_ptr<ASTNode> node = parse(&tokens);
+    std::shared_ptr<ASTNode> root_node = std::make_shared<ASTNode>(NodeType::Root, "");
+    parse(&tokens, root_node);
     auto parser_elapsed = std::chrono::high_resolution_clock::now() - parser_start;
 
     printf("\n");
-    print_ast(node);
+    print_ast(root_node);
 
     auto generator_start = std::chrono::high_resolution_clock::now();
     std::stringstream buffer;
@@ -416,7 +449,7 @@ int main(int argc, char **argv)
     buffer << ".text\n";
     buffer << "\n_start:\n";
 
-    generate_code(node, buffer);
+    generate_code(root_node, buffer);
 
     buffer << "\tmov x16, #1\n";
     buffer << "\tsvc #0\n";
