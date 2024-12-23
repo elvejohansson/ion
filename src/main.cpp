@@ -39,6 +39,7 @@ enum NodeType {
     Assignment,
     BinaryOperator,
     Number,
+    Identifier,
 };
 
 struct ASTNode {
@@ -72,6 +73,7 @@ const char* print_node_type(NodeType node_type)
         case NodeType::Assignment: return "Assignment";
         case NodeType::BinaryOperator: return "Operator";
         case NodeType::Number: return "Number";
+        case NodeType::Identifier: return "Identifier";
     }
 }
 
@@ -228,6 +230,10 @@ std::shared_ptr<ASTNode> parse_factor(const std::vector<Token>* tokens)
         return std::make_shared<ASTNode>(NodeType::Number, tokens->at(current - 1).value);
     }
 
+    if (match(tokens, TokenType::IDENTIFIER)) {
+        return std::make_shared<ASTNode>(NodeType::Identifier, tokens->at(current - 1).value);
+    }
+
     if (match(tokens, TokenType::LEFT_PAREN)) {
         std::shared_ptr<ASTNode> inner = parse_expression(tokens);
 
@@ -337,17 +343,23 @@ void print_ast(const std::shared_ptr<ASTNode>& node, int depth = 0) {
 }
 
 std::unordered_map<std::string, int> symbol_table;
-int current_offset = -16;
 
-int get_variable_offset(const std::string& variable_name) {
+// this insane hack will let us handle up to 8 variables until we start overwriting the symbol
+// table locations. literally the worst solution ever but im too tired to solve it another way
+// right now -_-
+int current_offset = -128;
+
+int get_variable_offset(const std::string& variable_name, int stack_pointer) {
 
     if (symbol_table.find(variable_name) == symbol_table.end()) {
         symbol_table[variable_name] = current_offset;
         current_offset -= 16;
     }
 
-    return symbol_table[variable_name];
+    return symbol_table[variable_name] - stack_pointer;
 }
+
+int pointer = 0;
 
 void generate_code(const std::shared_ptr<ASTNode> node, std::stringstream& stream)
 {
@@ -360,14 +372,17 @@ void generate_code(const std::shared_ptr<ASTNode> node, std::stringstream& strea
         }
         case NodeType::Number: {
             stream << "\tmov x0, #" << node->value << "\n";
+
             break;
         }
         case NodeType::BinaryOperator: {
             generate_code(node->children[0], stream);
             stream << "\tstr x0, [sp, -16]!\n";
+            pointer -= 16;
 
             generate_code(node->children[1], stream);
             stream << "\tldr x1, [sp], 16\n";
+            pointer += 16;
 
             if (node->value == "+") {
                 stream << "\tadd x0, x1, x0\n";
@@ -385,9 +400,17 @@ void generate_code(const std::shared_ptr<ASTNode> node, std::stringstream& strea
             generate_code(node->children[0], stream);
 
             std::string variable_name = node->value;
-            int stack_offset = get_variable_offset(variable_name);
+            int stack_offset = get_variable_offset(variable_name, pointer);
 
             stream << "\tstr x0, [sp, " << stack_offset << "]\n";
+
+            break;
+        }
+        case NodeType::Identifier: {
+            std::string variable_name = node->value;
+            int stack_offset = get_variable_offset(variable_name, pointer);
+
+            stream << "\tldr x0, [sp, " << stack_offset << "]\n";
 
             break;
         }
@@ -460,10 +483,18 @@ int main(int argc, char **argv)
     compile_program(buffer);
     auto compilation_elapsed = std::chrono::high_resolution_clock::now() - compilation_start;
 
-    float tokenizer_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(tokenizer_elapsed).count();
-    float parser_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(parser_elapsed).count();
-    float generator_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(generator_elapsed).count();
-    long long compilation_milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(compilation_elapsed).count();
+    float tokenizer_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(
+        tokenizer_elapsed
+    ).count();
+    float parser_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(
+        parser_elapsed
+    ).count();
+    float generator_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(
+        generator_elapsed
+    ).count();
+    long long compilation_milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
+        compilation_elapsed
+    ).count();
 
     printf("\n");
     printf("Tokenization took %f ms\n", tokenizer_microseconds / 1000);
