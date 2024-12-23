@@ -11,6 +11,8 @@ enum TokenType {
     OPERATOR_MINUS,
     OPERATOR_STAR,
     OPERATOR_SLASH,
+    LEFT_PAREN,
+    RIGHT_PAREN,
     _EOF,
 };
 
@@ -40,6 +42,8 @@ std::string print_token_type(TokenType token_type)
         case TokenType::OPERATOR_MINUS: return "OPERATOR_MINUS";
         case TokenType::OPERATOR_STAR: return "OPERATOR_STAR";
         case TokenType::OPERATOR_SLASH: return "OPERATOR_SLASH";
+        case TokenType::LEFT_PAREN: return "LEFT_PAREN";
+        case TokenType::RIGHT_PAREN: return "RIGHT_PAREN";
         case TokenType::_EOF: return "EOF";
     }
 }
@@ -121,6 +125,18 @@ std::vector<Token> tokenize(const std::string contents)
             tokens.push_back(token);
 
             char_count++;
+        } else if (current_char == '(') {
+            Token token;
+            token.type = TokenType::LEFT_PAREN;
+            tokens.push_back(token);
+
+            char_count++;
+        } else if (current_char == ')') {
+            Token token;
+            token.type = TokenType::RIGHT_PAREN;
+            tokens.push_back(token);
+
+            char_count++;
         } else if (current_char == '\n') {
             line_count++;
             char_count = 1;
@@ -167,10 +183,25 @@ const bool match(const std::vector<Token>* tokens, TokenType type)
     return false;
 }
 
+std::shared_ptr<ASTNode> parse_factor(const std::vector<Token>* tokens);
+std::shared_ptr<ASTNode> parse_term(const std::vector<Token>* tokens);
+std::shared_ptr<ASTNode> parse_expression(const std::vector<Token>* tokens);
+
 std::shared_ptr<ASTNode> parse_factor(const std::vector<Token>* tokens)
 {
     if (match(tokens, TokenType::INT_LIT)) {
         return std::make_shared<ASTNode>(NodeType::Number, tokens->at(current - 1).value);
+    }
+
+    if (match(tokens, TokenType::LEFT_PAREN)) {
+        std::shared_ptr<ASTNode> inner = parse_expression(tokens);
+
+        if (!match(tokens, TokenType::RIGHT_PAREN)) {
+            printf("No matching closing parentheses found.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        return inner;
     }
 
     printf("UNEXPECTED FACTOR");
