@@ -469,11 +469,11 @@ int get_variable_offset(const std::string& variable_name, int stack_pointer) {
 
 int pointer = 0;
 
+// used to calculate jump labels for jumping back into the main method
+int jump_index = 0;
+
 void generate_code(const std::shared_ptr<ASTNode> node, std::stringstream& stream)
 {
-    // used to calculate jump labels for jumping back into the main method
-    int jump_index = 0;
-
     switch (node->type) {
         case NodeType::Root: {
             for (int i = 0; i < node->children.size(); i++) {
