@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 
 #if defined (__APPLE__)
@@ -18,6 +19,11 @@ enum TokenType {
     IDENTIFIER,     // xy
     ASSIGNMENT,     // =
 
+    BOOLEAN,        // true / false
+
+    IF,             // if
+    ELSE,           // else
+
     OPERATOR_PLUS,  // +
     OPERATOR_MINUS, // -
     OPERATOR_STAR,  // *
@@ -25,6 +31,8 @@ enum TokenType {
 
     LEFT_PAREN,     // (
     RIGHT_PAREN,    // )
+    LEFT_BRACE,     // {
+    RIGHT_BRACE,    // }
 
     _EOF,
 };
@@ -40,6 +48,10 @@ enum NodeType {
     BinaryOperator,
     Number,
     Identifier,
+    Boolean,
+    If,
+    Else,
+    Block,
 };
 
 struct ASTNode {
@@ -56,12 +68,17 @@ const char* print_token_type(TokenType token_type)
         case TokenType::INT_LIT: return "INT_LIT";
         case TokenType::IDENTIFIER: return "IDENTIFIER";
         case TokenType::ASSIGNMENT: return "ASSIGNMENT";
+        case TokenType::BOOLEAN: return "BOOLEAN";
+        case TokenType::IF: return "IF";
+        case TokenType::ELSE: return "ELSE";
         case TokenType::OPERATOR_PLUS: return "OPERATOR_PLUS";
         case TokenType::OPERATOR_MINUS: return "OPERATOR_MINUS";
         case TokenType::OPERATOR_STAR: return "OPERATOR_STAR";
         case TokenType::OPERATOR_SLASH: return "OPERATOR_SLASH";
         case TokenType::LEFT_PAREN: return "LEFT_PAREN";
         case TokenType::RIGHT_PAREN: return "RIGHT_PAREN";
+        case TokenType::LEFT_BRACE: return "{";
+        case TokenType::RIGHT_BRACE: return "}";
         case TokenType::_EOF: return "EOF";
     }
 }
@@ -74,6 +91,10 @@ const char* print_node_type(NodeType node_type)
         case NodeType::BinaryOperator: return "Operator";
         case NodeType::Number: return "Number";
         case NodeType::Identifier: return "Identifier";
+        case NodeType::Boolean: return "Boolean";
+        case NodeType::If: return "If";
+        case NodeType::Else: return "Else";
+        case NodeType::Block: return "Block";
     }
 }
 
@@ -101,6 +122,31 @@ std::vector<Token> tokenize(const std::string contents)
             }
 
             i--;
+
+            if (buffer == "true" || buffer == "false") {
+                Token token;
+                token.type = TokenType::BOOLEAN;
+                token.value = buffer;
+                tokens.push_back(token);
+                buffer.clear();
+                continue;
+            }
+
+            if (buffer == "if") {
+                Token token;
+                token.type = TokenType::IF;
+                tokens.push_back(token);
+                buffer.clear();
+                continue;
+            }
+
+            if (buffer == "else") {
+                Token token;
+                token.type = TokenType::ELSE;
+                tokens.push_back(token);
+                buffer.clear();
+                continue;
+            }
 
             Token token;
             token.type = TokenType::IDENTIFIER;
@@ -158,6 +204,18 @@ std::vector<Token> tokenize(const std::string contents)
         } else if (current_char == ')') {
             Token token;
             token.type = TokenType::RIGHT_PAREN;
+            tokens.push_back(token);
+
+            char_count++;
+        } else if (current_char == '{') {
+            Token token;
+            token.type = TokenType::LEFT_BRACE;
+            tokens.push_back(token);
+
+            char_count++;
+        } else if (current_char == '}') {
+            Token token;
+            token.type = TokenType::RIGHT_BRACE;
             tokens.push_back(token);
 
             char_count++;
@@ -232,6 +290,10 @@ std::shared_ptr<ASTNode> parse_factor(const std::vector<Token>* tokens)
 
     if (match(tokens, TokenType::IDENTIFIER)) {
         return std::make_shared<ASTNode>(NodeType::Identifier, tokens->at(current - 1).value);
+    }
+
+    if (match(tokens, TokenType::BOOLEAN)) {
+        return std::make_shared<ASTNode>(NodeType::Boolean, tokens->at(current - 1).value);
     }
 
     if (match(tokens, TokenType::LEFT_PAREN)) {
@@ -314,6 +376,52 @@ std::shared_ptr<ASTNode> parse_statement(const std::vector<Token>* tokens)
         return node;
     }
 
+    if (peek(tokens).type == TokenType::IF && peek(tokens, 1).type == TokenType::LEFT_PAREN) {
+        std::shared_ptr<ASTNode> node = std::make_shared<ASTNode>(NodeType::If, "");
+        advance(tokens);
+
+        auto if_expression = parse_expression(tokens);
+
+        node->children.push_back(if_expression);
+
+        if (peek(tokens).type != TokenType::LEFT_BRACE) {
+            printf("Syntax error, expected opening brace after conditional expression.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        advance(tokens); // skip the first brace
+
+        std::shared_ptr<ASTNode> block_node = std::make_shared<ASTNode>(NodeType::Block, "");
+
+        while (!match(tokens, TokenType::RIGHT_BRACE)) {
+            std::shared_ptr<ASTNode> child_statement = parse_statement(tokens);
+
+            block_node->children.push_back(child_statement);
+        }
+
+        node->children.push_back(block_node);
+
+        if (peek(tokens).type == TokenType::ELSE && peek(tokens, 1).type == TokenType::LEFT_BRACE) {
+            std::shared_ptr<ASTNode> else_node = std::make_shared<ASTNode>(NodeType::Else, "");
+            std::shared_ptr<ASTNode> else_block_node = std::make_shared<ASTNode>(NodeType::Block, "");
+
+            else_node->children.push_back(else_block_node);
+
+            advance(tokens);
+            advance(tokens);
+
+            while (!match(tokens, TokenType::RIGHT_BRACE)) {
+                std::shared_ptr<ASTNode> else_child_statement = parse_statement(tokens);
+
+                else_block_node->children.push_back(else_child_statement);
+            }
+
+            node->children.push_back(else_node);
+        }
+
+        return node;
+    }
+
     printf("Syntax error, unexpected type %s.", print_token_type(peek(tokens).type));
     exit(EXIT_FAILURE);
 
@@ -363,6 +471,9 @@ int pointer = 0;
 
 void generate_code(const std::shared_ptr<ASTNode> node, std::stringstream& stream)
 {
+    // used to calculate jump labels for jumping back into the main method
+    int jump_index = 0;
+
     switch (node->type) {
         case NodeType::Root: {
             for (int i = 0; i < node->children.size(); i++) {
@@ -414,6 +525,61 @@ void generate_code(const std::shared_ptr<ASTNode> node, std::stringstream& strea
 
             break;
         }
+        case NodeType::Boolean: {
+            int bool_value = node->value == "true" ? 1 : 0;
+
+            stream << "\tmov x0, #" << bool_value << "\n";
+
+            break;
+        }
+        case NodeType::If: {
+            generate_code(node->children[0], stream); // if expression
+
+            // if the above expression is a constant value i.e. a bool or something trvially
+            // inferred, we can probably fold one branch
+
+            stream << "\tcmp x0, #1\n";
+
+            // based on comparison operator we select a condition flag, e.g. == becomes EQ
+            // maybe calculate label at lexer time, and put it in the value for the if node?
+            // store jump labels somewhere (symbol table?) or above method
+            stream << "\tb.ne _else" << jump_index << "\n";
+
+            stream << "_if" << jump_index << ":\n";
+            generate_code(node->children[1], stream);
+
+            if (node->children.at(node->children.size() - 1)->type == NodeType::Else) {
+                generate_code(node->children[node->children.size() - 1], stream);
+            } else {
+                // generate an empty else for current jump index as to not fall through
+                stream << "_else" << jump_index << ":\n";
+            }
+
+            stream << "_main_" << jump_index << ":\n";
+
+            jump_index++;
+
+            break;
+        }
+        case NodeType::Else: {
+            stream << "_else" << jump_index << ":\n";
+
+            generate_code(node->children[0], stream);
+
+            break;
+        }
+        case NodeType::Block: {
+            // handle scopes
+
+            // generate code for all statements in block
+            for (int i = 0; i < node->children.size(); i++) {
+                generate_code(node->children[i], stream);
+            }
+
+            stream << "\tb _main_" << jump_index << "\n";
+
+            break;
+        }
     }
 }
 
@@ -426,7 +592,7 @@ void compile_program(const std::stringstream& stream)
 
 #if defined (_MAC_OS) && defined (_ARM64)
     std::system("as ./build/program.s -o ./build/program.o");
-    std::system("ld ./build/program.o -o ./build/program -e _start");
+    std::system("ld ./build/program.o -o ./build/program -e _main");
     printf("\nSuccessfully compiled program.\n");
 #else
     printf("\nUnsupported compilation architecture, exiting...\n");
@@ -468,9 +634,9 @@ int main(int argc, char **argv)
 
     auto generator_start = std::chrono::high_resolution_clock::now();
     std::stringstream buffer;
-    buffer << ".global _start\n";
+    buffer << ".global _main\n";
     buffer << ".text\n";
-    buffer << "\n_start:\n";
+    buffer << "\n_main:\n";
 
     generate_code(root_node, buffer);
 
