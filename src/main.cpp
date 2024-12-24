@@ -15,24 +15,31 @@
 #endif
 
 enum TokenType {
-    INT_LIT,        // 123
-    IDENTIFIER,     // xy
-    ASSIGNMENT,     // =
+    INT_LIT,         // 123
+    IDENTIFIER,      // xy
+    ASSIGNMENT,      // =
 
-    BOOLEAN,        // true / false
+    BOOLEAN,         // true / false
 
-    IF,             // if
-    ELSE,           // else
+    IF,              // if
+    ELSE,            // else
 
-    OPERATOR_PLUS,  // +
-    OPERATOR_MINUS, // -
-    OPERATOR_STAR,  // *
-    OPERATOR_SLASH, // /
+    OPERATOR_PLUS,   // +
+    OPERATOR_MINUS,  // -
+    OPERATOR_STAR,   // *
+    OPERATOR_SLASH,  // /
 
-    LEFT_PAREN,     // (
-    RIGHT_PAREN,    // )
-    LEFT_BRACE,     // {
-    RIGHT_BRACE,    // }
+    CONDITION_OPERATOR_EQ,  // ==
+    CONDITION_OPERATOR_NE,  // !=
+    CONDITION_OPERATOR_LT,  // <
+    CONDITION_OPERATOR_GT,  // >
+    CONDITION_OPERATOR_GTE, // >=
+    CONDITION_OPERATOR_LTE, // <=
+
+    LEFT_PAREN,      // (
+    RIGHT_PAREN,     // )
+    LEFT_BRACE,      // {
+    RIGHT_BRACE,     // }
 
     _EOF,
 };
@@ -46,6 +53,7 @@ enum NodeType {
     Root,
     Assignment,
     BinaryOperator,
+    ConditionOperator,
     Number,
     Identifier,
     Boolean,
@@ -75,6 +83,12 @@ const char* print_token_type(TokenType token_type)
         case TokenType::OPERATOR_MINUS: return "OPERATOR_MINUS";
         case TokenType::OPERATOR_STAR: return "OPERATOR_STAR";
         case TokenType::OPERATOR_SLASH: return "OPERATOR_SLASH";
+        case TokenType::CONDITION_OPERATOR_EQ: return "EQ";
+        case TokenType::CONDITION_OPERATOR_NE: return "NE";
+        case TokenType::CONDITION_OPERATOR_GT: return "GT";
+        case TokenType::CONDITION_OPERATOR_LT: return "LT";
+        case TokenType::CONDITION_OPERATOR_GTE: return "GTE";
+        case TokenType::CONDITION_OPERATOR_LTE: return "LTE";
         case TokenType::LEFT_PAREN: return "LEFT_PAREN";
         case TokenType::RIGHT_PAREN: return "RIGHT_PAREN";
         case TokenType::LEFT_BRACE: return "{";
@@ -89,6 +103,7 @@ const char* print_node_type(NodeType node_type)
         case NodeType::Root: return "Root";
         case NodeType::Assignment: return "Assignment";
         case NodeType::BinaryOperator: return "Operator";
+        case NodeType::ConditionOperator: return "ConditionOperator";
         case NodeType::Number: return "Number";
         case NodeType::Identifier: return "Identifier";
         case NodeType::Boolean: return "Boolean";
@@ -103,7 +118,6 @@ std::vector<Token> tokenize(const std::string contents)
     std::vector<Token> tokens;
 
     int line_count = 1;
-    int char_count = 1;
     std::string buffer;
 
     for (int i = 0; i < contents.length(); i++) {
@@ -113,12 +127,10 @@ std::vector<Token> tokenize(const std::string contents)
             buffer.push_back(current_char);
 
             i++;
-            char_count++;
 
             while (std::isalnum(contents.at(i))) {
                 buffer.push_back(contents.at(i));
                 i++;
-                char_count++;
             }
 
             i--;
@@ -156,12 +168,10 @@ std::vector<Token> tokenize(const std::string contents)
         } else if (std::isdigit(current_char)) {
             buffer.push_back(current_char);
             i++;
-            char_count++;
 
             while (std::isdigit(contents.at(i))) {
                 buffer.push_back(contents.at(i));
                 i++;
-                char_count++;
             }
 
             i--;
@@ -175,65 +185,55 @@ std::vector<Token> tokenize(const std::string contents)
             Token token;
             token.type = TokenType::OPERATOR_PLUS;
             tokens.push_back(token);
-
-            char_count++;
         } else if (current_char == '-') {
             Token token;
             token.type = TokenType::OPERATOR_MINUS;
             tokens.push_back(token);
-
-            char_count++;
         } else if (current_char == '*') {
             Token token;
             token.type = TokenType::OPERATOR_STAR;
             tokens.push_back(token);
-
-            char_count++;
         } else if (current_char == '/') {
             Token token;
             token.type = TokenType::OPERATOR_SLASH;
             tokens.push_back(token);
-
-            char_count++;
         } else if (current_char == '(') {
             Token token;
             token.type = TokenType::LEFT_PAREN;
             tokens.push_back(token);
-
-            char_count++;
         } else if (current_char == ')') {
             Token token;
             token.type = TokenType::RIGHT_PAREN;
             tokens.push_back(token);
-
-            char_count++;
         } else if (current_char == '{') {
             Token token;
             token.type = TokenType::LEFT_BRACE;
             tokens.push_back(token);
-
-            char_count++;
         } else if (current_char == '}') {
             Token token;
             token.type = TokenType::RIGHT_BRACE;
             tokens.push_back(token);
-
-            char_count++;
         } else if (current_char == '=') {
-            Token token;
-            token.type = TokenType::ASSIGNMENT;
-            tokens.push_back(token);
+            i++;
 
-            char_count++;
+            if (contents.at(i) == '=') {
+                Token token;
+                token.type = TokenType::CONDITION_OPERATOR_EQ;
+                tokens.push_back(token);
+            } else if (std::isspace(contents.at(i))) {
+                Token token;
+                token.type = TokenType::ASSIGNMENT;
+                tokens.push_back(token);
+            } else {
+                i--;
+            }
         } else if (current_char == '\n') {
             line_count++;
-            char_count = 1;
             continue;
         } else if (isspace(current_char)) {
-            char_count++;
             continue;
         } else {
-            printf("Syntax error at %d:%d\n.", line_count, char_count);
+            printf("Syntax error on line %d\n.", line_count);
             exit(EXIT_FAILURE);
         }
     }
@@ -356,6 +356,21 @@ std::shared_ptr<ASTNode> parse_expression(const std::vector<Token>* tokens)
         node = newNode;
     }
 
+    while (match(tokens, TokenType::CONDITION_OPERATOR_EQ)) {
+        TokenType type = tokens->at(current - 1).type;
+        std::shared_ptr<ASTNode> right = parse_term(tokens);
+
+        std::string operation;
+        if (type == TokenType::CONDITION_OPERATOR_EQ) {
+            operation = "==";
+        }
+
+        std::shared_ptr<ASTNode> condition_node = std::make_shared<ASTNode>(NodeType::ConditionOperator, operation);
+        condition_node->children.push_back(node);
+        condition_node->children.push_back(right);
+        node = condition_node;
+    }
+
     return node;
 }
 
@@ -467,6 +482,17 @@ int get_variable_offset(const std::string& variable_name, int stack_pointer) {
     return symbol_table[variable_name] - stack_pointer;
 }
 
+const char* condition_operator_to_arm64_condition_flag(const std::string cond_operator)
+{
+    if (cond_operator == "==") {
+        return "NE";
+    } else {
+        // maybe we should fail more gracefully here?
+        printf("Unknown condition operator %s, cannot continue.", cond_operator.c_str());
+        exit(EXIT_FAILURE);
+    }
+}
+
 int pointer = 0;
 
 // used to calculate jump labels for jumping back into the main method
@@ -532,18 +558,38 @@ void generate_code(const std::shared_ptr<ASTNode> node, std::stringstream& strea
 
             break;
         }
+        case NodeType::ConditionOperator: {
+            generate_code(node->children[0], stream);
+            stream << "\tstr x0, [sp, -16]!\n";
+            pointer -= 16;
+
+            generate_code(node->children[1], stream);
+            stream << "\tldr x1, [sp], 16\n";
+            pointer += 16;
+
+            stream << "\tcmp x0, x1\n";
+
+            break;
+        }
         case NodeType::If: {
-            generate_code(node->children[0], stream); // if expression
+            std::shared_ptr<ASTNode> expression_node = node->children.at(0);
 
-            // if the above expression is a constant value i.e. a bool or something trvially
-            // inferred, we can probably fold one branch
+            generate_code(expression_node, stream); // expression
 
-            stream << "\tcmp x0, #1\n";
+            if (expression_node->type == NodeType::ConditionOperator) {
+                // based on comparison operator we select a condition flag, e.g. == becomes EQ
+                const char* condition_flag = condition_operator_to_arm64_condition_flag(expression_node->value);
 
-            // based on comparison operator we select a condition flag, e.g. == becomes EQ
-            // maybe calculate label at lexer time, and put it in the value for the if node?
-            // store jump labels somewhere (symbol table?) or above method
-            stream << "\tb.ne _else" << jump_index << "\n";
+                // maybe calculate label at lexer time, and put it in the value for the if node?
+                // store jump labels somewhere (symbol table?) or above method
+                stream << "\tb." << condition_flag << " _else" << jump_index << "\n";
+            } else if (expression_node->type == NodeType::Boolean) {
+                stream << "\tcmp x0, #1\n";
+
+                stream << "\tb.ne _else" << jump_index << "\n";
+
+                // we should be able to fold at least one branch here no?
+            }
 
             stream << "_if" << jump_index << ":\n";
             generate_code(node->children[1], stream);
