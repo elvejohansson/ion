@@ -51,13 +51,13 @@ std::vector<Token> tokenize(const std::string contents)
     for (int i = 0; i < contents.length(); i++) {
         char current_char = contents.at(i);
 
-        if (std::isalpha(current_char)) {
+        if (std::isalpha(current_char) != 0) {
             buffer.push_back(current_char);
 
             i++;
             characher_count++;
 
-            while (std::isalnum(contents.at(i))) {
+            while (std::isalnum(contents.at(i)) != 0) {
                 buffer.push_back(contents.at(i));
                 i++;
                 characher_count++;
@@ -104,12 +104,12 @@ std::vector<Token> tokenize(const std::string contents)
             token.character = characher_count - buffer.length() + 1;
             tokens.push_back(token);
             buffer.clear();
-        } else if (std::isdigit(current_char)) {
+        } else if (std::isdigit(current_char) != 0) {
             buffer.push_back(current_char);
             i++;
             characher_count++;
 
-            while (std::isdigit(contents.at(i))) {
+            while (std::isdigit(contents.at(i)) != 0) {
                 buffer.push_back(contents.at(i));
                 i++;
                 characher_count++;
@@ -153,16 +153,16 @@ std::vector<Token> tokenize(const std::string contents)
                     characher_count++;
                 }
                 continue;
-            } else {
-                i--;
-                characher_count--;
-
-                Token token;
-                token.type = TokenType::OPERATOR_SLASH;
-                token.line = line_count;
-                token.character = characher_count;
-                tokens.push_back(token);
             }
+
+            i--;
+            characher_count--;
+
+            Token token;
+            token.type = TokenType::OPERATOR_SLASH;
+            token.line = line_count;
+            token.character = characher_count;
+            tokens.push_back(token);
         } else if (current_char == '(') {
             Token token;
             token.type = TokenType::LEFT_PAREN;
@@ -197,7 +197,7 @@ std::vector<Token> tokenize(const std::string contents)
                 token.line = line_count;
                 token.character = characher_count;
                 tokens.push_back(token);
-            } else if (std::isspace(contents.at(i))) {
+            } else if (std::isspace(contents.at(i)) != 0) {
                 Token token;
                 token.type = TokenType::ASSIGNMENT;
                 token.line = line_count;
@@ -211,7 +211,7 @@ std::vector<Token> tokenize(const std::string contents)
             line_count++;
             characher_count = 1;
             continue;
-        } else if (isspace(current_char)) {
+        } else if (isspace(current_char) != 0) {
             characher_count++;
             continue;
         } else {

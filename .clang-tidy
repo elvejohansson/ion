@@ -1,0 +1,3 @@
+Checks: '-*,readability-*,performance-*'
+WarningsAsErrors: ''
+HeaderFilterRegex: ''

@@ -3,7 +3,7 @@
 
 #include <string>
 
-enum TokenType {
+enum TokenType : uint8_t {
     INT_LIT,         // 123
     IDENTIFIER,      // xy
     ASSIGNMENT,      // =
@@ -37,6 +37,6 @@ struct Token {
 
 const char* print_token_type(TokenType token_type);
 
-std::vector<Token> tokenize(const std::string contents);
+std::vector<Token> tokenize(std::string contents);
 
 #endif

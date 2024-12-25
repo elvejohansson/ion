@@ -6,7 +6,7 @@
 
 #include "lexer.hpp"
 
-enum NodeType {
+enum NodeType : uint8_t {
     Root,
     Assignment,
     BinaryOperator,
@@ -24,7 +24,7 @@ struct ASTNode {
     std::string value;
     std::vector<std::shared_ptr<ASTNode>> children;
 
-    ASTNode(const NodeType& t, const std::string& v) : type(t), value(v) {}
+    ASTNode(const NodeType& type, const std::string& value) : type(type), value(value) {}
 };
 
 Token peek(const std::vector<Token>* tokens, int lookahead);

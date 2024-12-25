@@ -21,15 +21,16 @@ int get_variable_offset(const std::string& variable_name, int stack_pointer) {
     return symbol_table[variable_name] - stack_pointer;
 }
 
-const char* condition_operator_to_arm64_condition_flag(const std::string cond_operator)
+const char* condition_operator_to_arm64_condition_flag(const std::string &cond_operator)
 {
     if (cond_operator == "==") {
         return "NE";
-    } else {
-        // maybe we should fail more gracefully here?
-        printf("Unknown condition operator %s, cannot continue.", cond_operator.c_str());
-        exit(EXIT_FAILURE);
     }
+
+    // maybe we should fail more gracefully here?
+    printf("Unknown condition operator %s, cannot continue.", cond_operator.c_str());
+    exit(EXIT_FAILURE);
+
 }
 
 int pointer = 0;
@@ -37,7 +38,7 @@ int pointer = 0;
 // used to calculate jump labels for jumping back into the main method
 int jump_index = 0;
 
-void generate_code(const std::shared_ptr<ASTNode> node, std::stringstream& stream)
+void generate_code(const std::shared_ptr<ASTNode>& node, std::stringstream& stream)
 {
     switch (node->type) {
         case NodeType::Root: {

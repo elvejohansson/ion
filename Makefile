@@ -20,6 +20,10 @@ $(OUT_DIR)/%.cpp.o: %.cpp
 	mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+.PHONY: lint
+lint:
+	@clang-tidy src/main.cpp -- -std=c++11
+
 .PHONY: clean
 clean:
 	rm -rf $(OUT_DIR)
