@@ -202,7 +202,12 @@ std::shared_ptr<ASTNode> parse_statement(const std::vector<Token>* tokens)
         return node;
     }
 
-    printf("Syntax error, unexpected type %s.", print_token_type(peek(tokens).type));
+    auto token = peek(tokens);
+
+    printf("\n\x1b[31m[error 1]\033[0m: %s was not expected here.\n", print_token_type(token.type));
+    printf("\t-> test.ion:%d:%d\n", token.line, token.character);
+    printf("\n");
+
     exit(EXIT_FAILURE);
 
     // return parse_expression(tokens);

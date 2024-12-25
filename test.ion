@@ -6,7 +6,6 @@ a = true
 b = false
 
 // This is a single-line comment. It works like you would expect :)
-
 if (a == b) {
     c = 5
 } else {

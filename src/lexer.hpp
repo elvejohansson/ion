@@ -19,11 +19,6 @@ enum TokenType {
     OPERATOR_SLASH,  // /
 
     CONDITION_OPERATOR_EQ,  // ==
-    CONDITION_OPERATOR_NE,  // !=
-    CONDITION_OPERATOR_LT,  // <
-    CONDITION_OPERATOR_GT,  // >
-    CONDITION_OPERATOR_GTE, // >=
-    CONDITION_OPERATOR_LTE, // <=
 
     LEFT_PAREN,      // (
     RIGHT_PAREN,     // )
@@ -36,6 +31,8 @@ enum TokenType {
 struct Token {
     TokenType type;
     std::string value;
+    int line;
+    int character;
 };
 
 const char* print_token_type(TokenType token_type);
