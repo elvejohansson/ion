@@ -110,9 +110,20 @@ std::vector<Token> tokenize(const std::string contents)
             token.type = TokenType::OPERATOR_STAR;
             tokens.push_back(token);
         } else if (current_char == '/') {
-            Token token;
-            token.type = TokenType::OPERATOR_SLASH;
-            tokens.push_back(token);
+            i++;
+
+            if (contents.at(i) == '/') {
+                while (contents.at(i) != '\n') {
+                    i++;
+                }
+                continue;
+            } else {
+                i--;
+
+                Token token;
+                token.type = TokenType::OPERATOR_SLASH;
+                tokens.push_back(token);
+            }
         } else if (current_char == '(') {
             Token token;
             token.type = TokenType::LEFT_PAREN;
