@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cstdlib>
 #include <vector>
 
 #include "lexer.hpp"
@@ -12,6 +13,8 @@ const char* print_token_type(TokenType token_type)
             return "'identifier'";
         case TokenType::ASSIGNMENT:
             return "'='";
+        case TokenType::BANG:
+            return "'!'";
         case TokenType::BOOLEAN:
             return "'boolean'";
         case TokenType::STRING:
@@ -30,6 +33,16 @@ const char* print_token_type(TokenType token_type)
             return "'/'";
         case TokenType::CONDITION_OPERATOR_EQ:
             return "'=='";
+        case TokenType::CONDITION_OPERATOR_NE:
+            return "'!='";
+        case TokenType::CONDITION_OPERATOR_GT:
+            return "'>'";
+        case TokenType::CONDITION_OPERATOR_LT:
+            return "'<'";
+        case TokenType::CONDITION_OPERATOR_GTE:
+            return "'>='";
+        case TokenType::CONDITION_OPERATOR_LTE:
+            return "'<='";
         case TokenType::LEFT_PAREN:
             return "'('";
         case TokenType::RIGHT_PAREN:
@@ -211,6 +224,69 @@ std::vector<Token> tokenize(const std::string& contents)
             } else {
                 i--;
                 character_count++;
+            }
+        } else if (current_char == '!') {
+            i++;
+            character_count++;
+
+            if (contents.at(i) == '=') {
+                Token token;
+                token.type = TokenType::CONDITION_OPERATOR_NE;
+                token.line = line_count;
+                token.character = character_count;
+                tokens.push_back(token);
+            } else if (std::isalnum(contents.at(i)) != 0) {
+                Token token;
+                token.type = TokenType::BANG;
+                token.line = line_count;
+                token.character = character_count;
+                tokens.push_back(token);
+            } else {
+                // @todo check me for correctness
+                printf("Invalid character following '!'.\n");
+                exit(EXIT_FAILURE);
+            }
+        } else if (current_char == '>') {
+            i++;
+            character_count++;
+
+            if (contents.at(i) == '=') {
+                Token token;
+                token.type = TokenType::CONDITION_OPERATOR_GTE;
+                token.line = line_count;
+                token.character = character_count;
+                tokens.push_back(token);
+            } else if (std::isalnum(contents.at(i)) != 0 || (std::isspace(contents.at(i)) != 0)) {
+                Token token;
+                token.type = TokenType::CONDITION_OPERATOR_GT;
+                token.line = line_count;
+                token.character = character_count;
+                tokens.push_back(token);
+            } else {
+                // @todo check me for correctness
+                i--;
+                character_count--;
+            }
+        } else if (current_char == '<') {
+            i++;
+            character_count++;
+
+            if (contents.at(i) == '=') {
+                Token token;
+                token.type = TokenType::CONDITION_OPERATOR_LTE;
+                token.line = line_count;
+                token.character = character_count;
+                tokens.push_back(token);
+            } else if (std::isalnum(contents.at(i)) != 0 || (std::isspace(contents.at(i)) != 0)) {
+                Token token;
+                token.type = TokenType::CONDITION_OPERATOR_LT;
+                token.line = line_count;
+                token.character = character_count;
+                tokens.push_back(token);
+            } else {
+                // @todo check me for correctness
+                i--;
+                character_count--;
             }
         } else if (current_char == '#') {
             i++;

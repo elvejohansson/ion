@@ -1,15 +1,13 @@
-x = 5
-
-if (true) {
-    y = 0
-}
-
-z = x - 4
-
-if (z) {
+if (3 <= 5) {
     // exit the process
     #asm {
         "mov x0, #42"
+        "mov x16, #1"
+        "svc #0"
+    }
+} else {
+    #asm {
+        "mov x0, #5"
         "mov x16, #1"
         "svc #0"
     }

@@ -128,13 +128,30 @@ std::shared_ptr<ASTNode> parse_expression(const std::vector<Token>* tokens)
         node = newNode;
     }
 
-    while (match(tokens, TokenType::CONDITION_OPERATOR_EQ)) {
+    while (
+        match(tokens, TokenType::CONDITION_OPERATOR_EQ) ||
+        match(tokens, TokenType::CONDITION_OPERATOR_NE) ||
+        match(tokens, TokenType::CONDITION_OPERATOR_GT) ||
+        match(tokens, TokenType::CONDITION_OPERATOR_LT) ||
+        match(tokens, TokenType::CONDITION_OPERATOR_GTE) ||
+        match(tokens, TokenType::CONDITION_OPERATOR_LTE)
+    ) {
         TokenType type = tokens->at(current - 1).type;
         std::shared_ptr<ASTNode> right = parse_term(tokens);
 
         std::string operation;
         if (type == TokenType::CONDITION_OPERATOR_EQ) {
             operation = "==";
+        } else if (type == TokenType::CONDITION_OPERATOR_NE) {
+            operation = "!=";
+        } else if (type == TokenType::CONDITION_OPERATOR_GT) {
+            operation = "<";
+        } else if (type == TokenType::CONDITION_OPERATOR_LT) {
+            operation = ">";
+        } else if (type == TokenType::CONDITION_OPERATOR_GTE) {
+            operation = ">=";
+        } else if (type == TokenType::CONDITION_OPERATOR_LTE) {
+            operation = "<=";
         }
 
         std::shared_ptr<ASTNode> condition_node = std::make_shared<ASTNode>(NodeType::ConditionOperator, operation);

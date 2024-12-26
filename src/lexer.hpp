@@ -7,6 +7,7 @@ enum TokenType : uint8_t {
     INT_LIT,         // 123
     IDENTIFIER,      // xy
     ASSIGNMENT,      // =
+    BANG,            // !
 
     BOOLEAN,         // true / false
     STRING,          // "hello"
@@ -20,6 +21,11 @@ enum TokenType : uint8_t {
     OPERATOR_SLASH,  // /
 
     CONDITION_OPERATOR_EQ,  // ==
+    CONDITION_OPERATOR_NE,  // !=
+    CONDITION_OPERATOR_GT,  // >
+    CONDITION_OPERATOR_LT,  // <
+    CONDITION_OPERATOR_GTE, // >=
+    CONDITION_OPERATOR_LTE, // <=
 
     LEFT_PAREN,      // (
     RIGHT_PAREN,     // )

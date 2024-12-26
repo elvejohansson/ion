@@ -59,7 +59,22 @@ void exit_scope(std::stringstream& stream) {
 const char* condition_operator_to_arm64_condition_flag(const std::string& cond_operator)
 {
     if (cond_operator == "==") {
+        return "EQ";
+    }
+    if (cond_operator == "!=") {
         return "NE";
+    }
+    if (cond_operator == ">") {
+        return "GT";
+    }
+    if (cond_operator == "<") {
+        return "LT";
+    }
+    if (cond_operator == ">=") {
+        return "LE";
+    }
+    if (cond_operator == "<=") {
+        return "GE";
     }
 
     // maybe we should fail more gracefully here?
@@ -151,22 +166,18 @@ void generate_code(const std::shared_ptr<ASTNode>& node, std::stringstream& stre
             generate_code(expression_node, stream); // expression
 
             if (expression_node->type == NodeType::ConditionOperator) {
-                // based on comparison operator we select a condition flag, e.g. == becomes EQ
                 const char* condition_flag = condition_operator_to_arm64_condition_flag(expression_node->value);
 
                 // maybe calculate label at lexer time, and put it in the value for the if node?
                 // store jump labels somewhere (symbol table?) or above method
-                stream << "\tb." << condition_flag << " _else" << jump_index << "\n";
+                stream << "\tb." << condition_flag << " _if" << jump_index << "\n";
             } else if (expression_node->type == NodeType::Boolean) {
                 stream << "\tcmp x0, #1\n";
 
-                stream << "\tb.ne _else" << jump_index << "\n";
+                stream << "\tb.eq _if" << jump_index << "\n";
 
                 // we should be able to fold at least one branch here no?
             }
-
-            stream << "_if" << jump_index << ":\n";
-            generate_code(node->children[1], stream);
 
             if (node->children.at(node->children.size() - 1)->type == NodeType::Else) {
                 generate_code(node->children[node->children.size() - 1], stream);
@@ -174,6 +185,9 @@ void generate_code(const std::shared_ptr<ASTNode>& node, std::stringstream& stre
                 // generate an empty else for current jump index as to not fall through
                 stream << "_else" << jump_index << ":\n";
             }
+
+            stream << "_if" << jump_index << ":\n";
+            generate_code(node->children[1], stream);
 
             stream << "_main_" << jump_index << ":\n";
 
