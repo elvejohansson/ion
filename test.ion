@@ -1,25 +1,17 @@
-x = (6 / 2) * 3
-y = x + 2 * x
-z = x + y
+x = 5
 
-a = true
-b = false
-
-// This is a single-line comment. It works like you would expect :)
-if (a == b) {
-    c = 5
-} else {
-    d = 10
+if (true) {
+    y = 0
 }
 
-if (5 == 3) {
-    e = 8
-} else {
-    f = 15
+z = x - 4
+
+if (z) {
+    // exit the process
+    #asm {
+        "mov x0, #42"
+        "mov x16, #1"
+        "svc #0"
+    }
 }
 
-#asm {
-    "mov x0, #42"
-    "mov x16, #1"
-    "svc #0"
-}

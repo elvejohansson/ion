@@ -3,10 +3,13 @@
 
 #include "parser.hpp"
 
-int get_variable_offset(const std::string& variable_name, int stack_pointer);
-
-const char* condition_operator_to_arm64_condition_flag(std::string cond_operator);
+struct Symbol {
+    std::string name;
+    int memory_location;
+};
 
 void generate_code(const std::shared_ptr<ASTNode>& node, std::stringstream& stream);
+
+void generate(const std::shared_ptr<ASTNode>& node, std::stringstream& stream);
 
 #endif

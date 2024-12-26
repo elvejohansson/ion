@@ -1,28 +1,62 @@
 #include <cstdio>
 #include <sstream>
-#include <string>
 #include <unordered_map>
 
 #include "parser.hpp"
+#include "generator.hpp"
 
-std::unordered_map<std::string, int> symbol_table;
+std::vector<std::unordered_map<std::string, Symbol>> st_stack;
 
 // this insane hack will let us handle up to 8 variables until we start overwriting the symbol
 // table locations. literally the worst solution ever but im too tired to solve it another way
 // right now -_-
 int current_offset = -128;
 
-int get_variable_offset(const std::string& variable_name, int stack_pointer) {
+Symbol declare_variable(const std::string& name) {
+    auto& current_scope = st_stack.back();
 
-    if (symbol_table.find(variable_name) == symbol_table.end()) {
-        symbol_table[variable_name] = current_offset;
-        current_offset -= 16;
+    if (current_scope.find(name) != current_scope.end()) {
+        return current_scope[name];
     }
 
-    return symbol_table[variable_name] - stack_pointer;
+    Symbol symbol = { name, current_offset };
+    current_scope[name] = symbol;
+
+    current_offset -= 16;
+
+    return symbol;
 }
 
-const char* condition_operator_to_arm64_condition_flag(const std::string &cond_operator)
+Symbol lookup_variable(const std::string& name) {
+    for (int i = st_stack.size() - 1; i >= 0; --i) {
+        auto current_table = st_stack.at(i);
+
+        if (current_table.find(name) != current_table.end()) {
+            return current_table[name];
+        }
+    }
+
+    printf("Variable '%s' was not found in this scope.\n", name.c_str());
+    exit(EXIT_FAILURE);
+}
+
+void enter_scope() {
+    std::unordered_map<std::string, Symbol> this_scope;
+    st_stack.push_back(this_scope);
+}
+
+void exit_scope(std::stringstream& stream) {
+    auto& current_scope = st_stack.back();
+
+    for (int i = 0; i < current_scope.size(); i++) {
+        stream << "\tldr x1, [sp], 16\n";
+        current_offset += 16;
+    }
+
+    st_stack.pop_back();
+}
+
+const char* condition_operator_to_arm64_condition_flag(const std::string& cond_operator)
 {
     if (cond_operator == "==") {
         return "NE";
@@ -31,7 +65,6 @@ const char* condition_operator_to_arm64_condition_flag(const std::string &cond_o
     // maybe we should fail more gracefully here?
     printf("Unknown condition operator %s, cannot continue.", cond_operator.c_str());
     exit(EXIT_FAILURE);
-
 }
 
 int pointer = 0;
@@ -77,18 +110,18 @@ void generate_code(const std::shared_ptr<ASTNode>& node, std::stringstream& stre
         case NodeType::Assignment: {
             generate_code(node->children[0], stream);
 
-            std::string variable_name = node->value;
-            int stack_offset = get_variable_offset(variable_name, pointer);
+            auto symbol = declare_variable(node->value);
+            int memory_location = symbol.memory_location - pointer;
 
-            stream << "\tstr x0, [sp, " << stack_offset << "]\n";
+            stream << "\tstr x0, [sp, " << memory_location << "]\n";
 
             break;
         }
         case NodeType::Identifier: {
-            std::string variable_name = node->value;
-            int stack_offset = get_variable_offset(variable_name, pointer);
+            auto symbol = lookup_variable(node->value);
+            int memory_location = symbol.memory_location - pointer;
 
-            stream << "\tldr x0, [sp, " << stack_offset << "]\n";
+            stream << "\tldr x0, [sp, " << memory_location << "]\n";
 
             break;
         }
@@ -156,11 +189,13 @@ void generate_code(const std::shared_ptr<ASTNode>& node, std::stringstream& stre
             break;
         }
         case NodeType::Block: {
-            // @todo handle scopes
+            enter_scope();
 
             for (int i = 0; i < node->children.size(); i++) {
                 generate_code(node->children[i], stream);
             }
+
+            exit_scope(stream);
 
             stream << "\tb _main_" << jump_index << "\n";
 
@@ -184,4 +219,16 @@ void generate_code(const std::shared_ptr<ASTNode>& node, std::stringstream& stre
             break;
         }
     }
+}
+
+
+void generate(const std::shared_ptr<ASTNode>& node, std::stringstream& stream) {
+    pointer = 0;
+    jump_index = 0;
+
+    std::unordered_map<std::string, Symbol> global_scope;
+
+    st_stack.push_back(global_scope);
+
+    generate_code(node, stream);
 }

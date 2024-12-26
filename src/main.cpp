@@ -59,7 +59,7 @@ int main(int argc, char **argv)
     buffer << ".text\n";
     buffer << "\n_main:\n";
 
-    generate_code(ast_root_node, buffer);
+    generate(ast_root_node, buffer);
 
     auto backend_elapsed = std::chrono::high_resolution_clock::now() - backend_start;
 
