@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <vector>
 
 #include "lexer.hpp"
@@ -13,6 +14,8 @@ const char* print_token_type(TokenType token_type)
             return "'='";
         case TokenType::BOOLEAN:
             return "'boolean'";
+        case TokenType::STRING:
+            return "'string'";
         case TokenType::IF:
             return "'if'";
         case TokenType::ELSE:
@@ -35,17 +38,19 @@ const char* print_token_type(TokenType token_type)
             return "'{'";
         case TokenType::RIGHT_BRACE:
             return "'}'";
+        case TokenType::ASM:
+            return "'#asm'";
         case TokenType::_EOF:
             return "'EOF'";
     }
 }
 
-std::vector<Token> tokenize(const std::string contents)
+std::vector<Token> tokenize(const std::string& contents)
 {
     std::vector<Token> tokens;
 
     int line_count = 1;
-    int characher_count = 1;
+    int character_count = 1;
     std::string buffer;
 
     for (int i = 0; i < contents.length(); i++) {
@@ -55,23 +60,23 @@ std::vector<Token> tokenize(const std::string contents)
             buffer.push_back(current_char);
 
             i++;
-            characher_count++;
+            character_count++;
 
             while (std::isalnum(contents.at(i)) != 0) {
                 buffer.push_back(contents.at(i));
                 i++;
-                characher_count++;
+                character_count++;
             }
 
             i--;
-            characher_count--;
+            character_count--;
 
             if (buffer == "true" || buffer == "false") {
                 Token token;
                 token.type = TokenType::BOOLEAN;
                 token.value = buffer;
                 token.line = line_count;
-                token.character = characher_count - buffer.length() + 1;
+                token.character = character_count - buffer.length() + 1;
                 tokens.push_back(token);
                 buffer.clear();
                 continue;
@@ -81,7 +86,7 @@ std::vector<Token> tokenize(const std::string contents)
                 Token token;
                 token.type = TokenType::IF;
                 token.line = line_count;
-                token.character = characher_count - buffer.length() + 1;
+                token.character = character_count - buffer.length() + 1;
                 tokens.push_back(token);
                 buffer.clear();
                 continue;
@@ -91,7 +96,7 @@ std::vector<Token> tokenize(const std::string contents)
                 Token token;
                 token.type = TokenType::ELSE;
                 token.line = line_count;
-                token.character = characher_count - buffer.length() + 1;
+                token.character = character_count - buffer.length() + 1;
                 tokens.push_back(token);
                 buffer.clear();
                 continue;
@@ -101,121 +106,160 @@ std::vector<Token> tokenize(const std::string contents)
             token.type = TokenType::IDENTIFIER;
             token.value = buffer;
             token.line = line_count;
-            token.character = characher_count - buffer.length() + 1;
+            token.character = character_count - buffer.length() + 1;
             tokens.push_back(token);
             buffer.clear();
         } else if (std::isdigit(current_char) != 0) {
             buffer.push_back(current_char);
             i++;
-            characher_count++;
+            character_count++;
 
             while (std::isdigit(contents.at(i)) != 0) {
                 buffer.push_back(contents.at(i));
                 i++;
-                characher_count++;
+                character_count++;
             }
 
             i--;
-            characher_count--;
+            character_count--;
 
             Token token;
             token.type = TokenType::INT_LIT;
             token.value = buffer;
             token.line = line_count;
-            token.character = characher_count - buffer.length() + 1;
+            token.character = character_count - buffer.length() + 1;
             tokens.push_back(token);
             buffer.clear();
         } else if (current_char == '+') {
             Token token;
             token.type = TokenType::OPERATOR_PLUS;
             token.line = line_count;
-            token.character = characher_count;
+            token.character = character_count;
             tokens.push_back(token);
         } else if (current_char == '-') {
             Token token;
             token.type = TokenType::OPERATOR_MINUS;
             token.line = line_count;
-            token.character = characher_count;
+            token.character = character_count;
             tokens.push_back(token);
         } else if (current_char == '*') {
             Token token;
             token.type = TokenType::OPERATOR_STAR;
             token.line = line_count;
-            token.character = characher_count;
+            token.character = character_count;
             tokens.push_back(token);
         } else if (current_char == '/') {
             i++;
-            characher_count++;
+            character_count++;
 
             if (contents.at(i) == '/') {
                 while (contents.at(i) != '\n') {
                     i++;
-                    characher_count++;
+                    character_count++;
                 }
                 continue;
             }
 
             i--;
-            characher_count--;
+            character_count--;
 
             Token token;
             token.type = TokenType::OPERATOR_SLASH;
             token.line = line_count;
-            token.character = characher_count;
+            token.character = character_count;
             tokens.push_back(token);
         } else if (current_char == '(') {
             Token token;
             token.type = TokenType::LEFT_PAREN;
             token.line = line_count;
-            token.character = characher_count;
+            token.character = character_count;
             tokens.push_back(token);
         } else if (current_char == ')') {
             Token token;
             token.type = TokenType::RIGHT_PAREN;
             token.line = line_count;
-            token.character = characher_count;
+            token.character = character_count;
             tokens.push_back(token);
         } else if (current_char == '{') {
             Token token;
             token.type = TokenType::LEFT_BRACE;
             token.line = line_count;
-            token.character = characher_count;
+            token.character = character_count;
             tokens.push_back(token);
         } else if (current_char == '}') {
             Token token;
             token.type = TokenType::RIGHT_BRACE;
             token.line = line_count;
-            token.character = characher_count;
+            token.character = character_count;
             tokens.push_back(token);
         } else if (current_char == '=') {
             i++;
-            characher_count++;
+            character_count++;
 
             if (contents.at(i) == '=') {
                 Token token;
                 token.type = TokenType::CONDITION_OPERATOR_EQ;
                 token.line = line_count;
-                token.character = characher_count;
+                token.character = character_count;
                 tokens.push_back(token);
             } else if (std::isspace(contents.at(i)) != 0) {
                 Token token;
                 token.type = TokenType::ASSIGNMENT;
                 token.line = line_count;
-                token.character = characher_count;
+                token.character = character_count;
                 tokens.push_back(token);
             } else {
                 i--;
-                characher_count++;
+                character_count++;
             }
+        } else if (current_char == '#') {
+            i++;
+
+            while (std::isalnum(contents.at(i)) != 0) {
+                buffer.push_back(contents.at(i));
+                i++;
+                character_count++;
+            }
+
+            i--;
+            character_count--;
+
+            if (buffer == "asm") {
+                Token token;
+                token.type = TokenType::ASM;
+                token.line = line_count;
+                token.character = character_count;
+                tokens.push_back(token);
+                buffer.clear();
+            } else {
+                printf("UNSUPPORTED COMPILER DIRECTIVE, ILLEGAL!\n");
+                exit(EXIT_FAILURE);
+            }
+        } else if (current_char == '"') {
+            i++;
+
+            while (contents.at(i) != '"') {
+                buffer.push_back(contents.at(i));
+                i++;
+                character_count++;
+            }
+
+            Token token;
+            token.type = TokenType::STRING;
+            token.value = buffer;
+            token.line = line_count;
+            token.character = character_count - buffer.length() + 1;
+            tokens.push_back(token);
+            buffer.clear();
         } else if (current_char == '\n') {
             line_count++;
-            characher_count = 1;
+            character_count = 1;
             continue;
         } else if (isspace(current_char) != 0) {
-            characher_count++;
+            character_count++;
             continue;
         } else {
-            printf("Syntax error on line %d\n.", line_count);
+            printf("Unrecognizable character '%c' near or at %d:%d\n.", current_char, line_count, character_count);
             exit(EXIT_FAILURE);
         }
     }
@@ -225,7 +269,7 @@ std::vector<Token> tokenize(const std::string contents)
     Token token;
     token.type = TokenType::_EOF;
     token.line = line_count;
-    token.character = characher_count;
+    token.character = character_count;
     tokens.push_back(token);
 
     return tokens;

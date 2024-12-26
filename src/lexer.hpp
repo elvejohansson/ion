@@ -9,6 +9,7 @@ enum TokenType : uint8_t {
     ASSIGNMENT,      // =
 
     BOOLEAN,         // true / false
+    STRING,          // "hello"
 
     IF,              // if
     ELSE,            // else
@@ -25,6 +26,8 @@ enum TokenType : uint8_t {
     LEFT_BRACE,      // {
     RIGHT_BRACE,     // }
 
+    ASM, // #asm
+
     _EOF,
 };
 
@@ -37,6 +40,6 @@ struct Token {
 
 const char* print_token_type(TokenType token_type);
 
-std::vector<Token> tokenize(std::string contents);
+std::vector<Token> tokenize(const std::string& contents);
 
 #endif

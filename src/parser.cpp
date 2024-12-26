@@ -1,5 +1,6 @@
 #include "parser.hpp"
 #include "lexer.hpp"
+#include <cstdio>
 
 const char* print_node_type(NodeType node_type)
 {
@@ -14,6 +15,8 @@ const char* print_node_type(NodeType node_type)
         case NodeType::If: return "If";
         case NodeType::Else: return "Else";
         case NodeType::Block: return "Block";
+        case NodeType::Directive: return "Directive";
+        case NodeType::String: return "String";
     }
 }
 
@@ -51,6 +54,10 @@ std::shared_ptr<ASTNode> parse_factor(const std::vector<Token>* tokens)
 {
     if (match(tokens, TokenType::INT_LIT)) {
         return std::make_shared<ASTNode>(NodeType::Number, tokens->at(current - 1).value);
+    }
+
+    if (match(tokens, TokenType::STRING)) {
+        return std::make_shared<ASTNode>(NodeType::String, tokens->at(current - 1).value);
     }
 
     if (match(tokens, TokenType::IDENTIFIER)) {
@@ -200,6 +207,30 @@ std::shared_ptr<ASTNode> parse_statement(const std::vector<Token>* tokens)
         }
 
         return node;
+    }
+
+    if (peek(tokens).type == TokenType::ASM) {
+        auto directive_node = std::make_shared<ASTNode>(NodeType::Directive, "asm");
+        advance(tokens);
+
+        if (peek(tokens).type != TokenType::LEFT_BRACE) {
+            printf("Syntax error, expected block after compiler directive.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        advance(tokens);
+
+        std::shared_ptr<ASTNode> block_node = std::make_shared<ASTNode>(NodeType::Block, "");
+
+        while (!match(tokens, TokenType::RIGHT_BRACE)) {
+            std::shared_ptr<ASTNode> child_statement = parse_factor(tokens);
+
+            block_node->children.push_back(child_statement);
+        }
+
+        directive_node->children.push_back(block_node);
+
+        return directive_node;
     }
 
     auto token = peek(tokens);

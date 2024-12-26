@@ -17,6 +17,8 @@ enum NodeType : uint8_t {
     If,
     Else,
     Block,
+    Directive,
+    String,
 };
 
 struct ASTNode {

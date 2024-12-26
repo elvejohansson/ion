@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -155,15 +156,31 @@ void generate_code(const std::shared_ptr<ASTNode>& node, std::stringstream& stre
             break;
         }
         case NodeType::Block: {
-            // handle scopes
+            // @todo handle scopes
 
-            // generate code for all statements in block
             for (int i = 0; i < node->children.size(); i++) {
                 generate_code(node->children[i], stream);
             }
 
             stream << "\tb _main_" << jump_index << "\n";
 
+            break;
+        }
+        case NodeType::Directive: {
+            std::string directive_type = node->value;
+
+            if (directive_type == "asm") {
+                for (int i = 0; i < node->children[0]->children.size(); i++) {
+                    // lets hops the user knows assembly :)
+                    // also, indent this depending on scope, maybe??
+                    stream << "\t" << node->children[0]->children[i]->value << "\n";
+                }
+            }
+
+            break;
+        }
+        case NodeType::String: {
+            // @todo handle string case
             break;
         }
     }

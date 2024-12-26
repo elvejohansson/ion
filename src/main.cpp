@@ -61,9 +61,6 @@ int main(int argc, char **argv)
 
     generate_code(ast_root_node, buffer);
 
-    buffer << "\tmov x16, #1\n";
-    buffer << "\tsvc #0\n";
-
     auto backend_elapsed = std::chrono::high_resolution_clock::now() - backend_start;
 
     compile_program(buffer);
